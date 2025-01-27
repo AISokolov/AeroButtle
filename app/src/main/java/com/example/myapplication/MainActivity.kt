@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -307,11 +309,11 @@ fun WaterQualityIndicator(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             contentAlignment = Alignment.Center,
-            //modifier = Modifier.clickable { // Remove clickable
-            //    if (!isAnalyzing) {
-            //        isAnalyzing = true
-            //    }
-            //}
+            modifier = Modifier.clickable {
+                if (!isAnalyzing) {
+                    isAnalyzing = true
+                }
+            }
         ) {
             CircularProgressIndicator(
                 progress = if (isAnalyzing) animatedPercentage.value / 100f else currentPercentage / 100f,
@@ -342,52 +344,6 @@ fun WaterQualityIndicator(
 }
 
 @Composable
-fun SettingsPanel(
-    onWearOfFiltersChange: (Float) -> Unit,
-    onAtmosphericLiquidGeneratorChange: (Float) -> Unit
-) {
-    var wearOfFiltersValue by remember { mutableFloatStateOf(0.95f) } // Default 95%
-    var atmosphericLiquidGeneratorValue by remember { mutableFloatStateOf(1.0f) } // Default 100%
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .background(MaterialTheme.colorScheme.surface) // Add a background
-    ) {
-        Text(
-            text = "Wear of Filters: ${(wearOfFiltersValue * 100).toInt()}%",
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Slider(
-            value = wearOfFiltersValue,
-            onValueChange = {
-                wearOfFiltersValue = it
-                onWearOfFiltersChange(it)
-            },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Atmospheric Liquid Generator: ${(atmosphericLiquidGeneratorValue * 100).toInt()}%",
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Slider(
-            value = atmosphericLiquidGeneratorValue,
-            onValueChange = {
-                atmosphericLiquidGeneratorValue = it
-                onAtmosphericLiquidGeneratorChange(it)
-            },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
 fun IndicatorsScreen() {
     var waterQualityPercentage by remember { mutableStateOf(99f) }
     Column(
@@ -397,12 +353,14 @@ fun IndicatorsScreen() {
         Indicator(
             label = "Battery",
             percentage = 67f,
-            color = Color.Yellow
+            color = Color.Yellow,
+            isCircle = true
         )
         Indicator(
             label = "Bottle Fill",
             percentage = 80f,
-            color = Color.Blue
+            color = Color.Blue,
+            isCircle = true
         )
         WaterQualityIndicator(
             onAnalyzeComplete = { newPercentage ->
@@ -418,6 +376,7 @@ fun Indicator(
     label: String,
     percentage: Float,
     color: Color,
+    isCircle: Boolean = false,
     labelBelow: String? = null
 ) {
     val animatedPercentage by animateFloatAsState(
@@ -426,21 +385,46 @@ fun Indicator(
     )
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                progress = animatedPercentage / 100f,
-                modifier = Modifier.size(150.dp),
-                color = color,
-                strokeWidth = 10.dp
-            )
-            Text(
-                text = "${animatedPercentage.toInt()}%",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+        if (isCircle) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = animatedPercentage / 100f,
+                    modifier = Modifier.size(150.dp),
+                    color = color,
+                    strokeWidth = 10.dp
+                )
+                Text(
+                    text = "${animatedPercentage.toInt()}%",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        } else {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+                    .padding(horizontal = 16.dp)
+            ) {
+                // Background
+                drawRoundRect(
+                    color = Color.LightGray,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                )
+
+                // Progress
+                drawRoundRect(
+                    color = color,
+                    size = androidx.compose.ui.geometry.Size(size.width * (animatedPercentage / 100f), size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                )
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = label, style = MaterialTheme.typography.titleMedium)
+        if (!isCircle) {
+            Text(text = "${animatedPercentage.toInt()}%", style = MaterialTheme.typography.bodyMedium)
+        }
         if (labelBelow != null) {
             Text(
                 text = labelBelow,
@@ -448,6 +432,22 @@ fun Indicator(
                 color = Color.Green
             )
         }
+    }
+}
+
+@Composable
+fun SettingRow(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    isEditable: Boolean
+) {
+    Column {
+        Indicator(
+            label = label,
+            percentage = value * 100,
+            color = Color.Blue
+        )
     }
 }
 
@@ -522,32 +522,7 @@ fun SettingsPanel(
     }
 }
 
-@Composable
-fun SettingRow(
-    label: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    isEditable: Boolean
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "$label: ${(value * 100).toInt()}%",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-        )
-        if (isEditable) {
-            Slider(
-                value = value,
-                onValueChange = onValueChange,
-                valueRange = 0f..1f,
-                modifier = Modifier.width(150.dp)
-            )
-        }
-    }
-}
+
 
 
 @Preview(showBackground = true)
